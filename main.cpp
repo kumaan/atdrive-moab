@@ -131,7 +131,7 @@ uint16_t Raw_rpmR; // for X wheels used
 uint16_t Raw_rpmL; // for X wheels used
 
 void udp_rx_worker() {
-    
+
 	 // Here we receive throttle and steering control from the auto-pilot computer
 	 
 	SocketAddress sockAddr;
@@ -153,8 +153,8 @@ void udp_rx_worker() {
 				u_printf("Timeout: resetting auto sbus values\n");
 				//auto_ch1 = 1024;
 				//auto_ch2 = 1024;
-                Raw_rpmR = 0;
-                Raw_rpmL = 0;
+				Raw_rpmR = 0;
+				Raw_rpmL = 0;
 			}
 		}
 
@@ -162,8 +162,8 @@ void udp_rx_worker() {
 			_last_autopilot = ts;
 			//auto_ch1 = control[0];
 			//auto_ch2 = control[1];
-            rpmR = control[0];
-            rpmL = control[1];
+			rpmR = control[0];
+			rpmL = control[1];
 		} else if (n >= 7) {
 			if (strncmp(inputBuffer, "moabCRI", 7) == 0) {
 				u_printf("  ** config read imu\n");
@@ -225,11 +225,11 @@ void set_mode_manual() {
 
 	//motorControl.set_steering(sbup.ch1);
 	//motorControl.set_throttle(sbup.ch3);
-    drive.vehicleControl(sbup.ch3, sbup.ch2, motorRPM);
-    //pc.printf("ch2 %d\n", sbup.ch2);
-    //pc.printf("ch4 %d\n", sbup.ch4);
-    drive.DriveWheels(motorRPM[0],motorRPM[1]);
-}
+	drive.vehicleControl(sbup.ch3, sbup.ch2, motorRPM);
+	//pc.printf("ch2 %d\n", sbup.ch2);
+	//pc.printf("ch4 %d\n", sbup.ch4);
+	drive.DriveWheels(motorRPM[0],motorRPM[1]);
+	}
 
 void set_mode_auto() {
 	myledR = 0;
@@ -240,10 +240,8 @@ void set_mode_auto() {
 	//motorControl.set_throttle(auto_ch2);
 	printf("rpmR: %f\n", rpmR);
 	printf("rpmL: %f\n", rpmL);
-    drive.DriveWheels(rpmR,rpmL);
+	drive.DriveWheels(rpmR,rpmL);
 }
-
-
 
 
 
@@ -388,10 +386,10 @@ void sbus_reTx_worker() {
 			} else {
 				set_mode_stop();
 				if (sbup.ch5 > 1500){
-                    stop_trig = false;
-                } else {
-                    stop_trig = true;
-                }
+					stop_trig = false;
+				} else {
+					stop_trig = true;
+				}
 			}
             
 			int retval = tx_sock.sendto(_AUTOPILOT_IP_ADDRESS, sbus_port,
@@ -400,7 +398,6 @@ void sbus_reTx_worker() {
 			if (retval < 0 && NETWORK_IS_UP) {
 				printf("UDP socket error in sbus_reTx_worker\n");
 			}
-            
 		}
 	}
 }
@@ -576,20 +573,20 @@ void eth_callback(nsapi_event_t status, intptr_t param) {
  
 int main() {
 
-    // X Drive Initialize ///
-    int initOK;
-    initOK = drive.Init();
-    if(initOK == 1)
-    {
-        pc.printf("Initialized OK!!!\n");
-    }
+	// X Drive Initialize ///
+	int initOK;
+	initOK = drive.Init();
+	if(initOK == 1)
+	{
+		pc.printf("Initialized OK!!!\n");
+	}
 
 	//  ######################################
 	//  #########################################
 	//  ###########################################
 	//   BEGIN:  setup network and udp socket
 	//  ############################################
-    
+
 	printf("\n\nStarting the network...\n");
 
 	net.attach(&eth_callback);
@@ -605,7 +602,7 @@ int main() {
 	//  #########################################
 	//  ######################################
 
-    // Serial ports
+	// Serial ports
 	sbus_in.format(8, SerialBase::Even, 2);  // S.Bus is 8E2
 	sbus_in.attach(&Sbus_Rx_Interrupt);
 	gps_in.attach(&Gps_Rx_Interrupt);
@@ -617,7 +614,7 @@ int main() {
 	tx_sock.open(&net);
 	tx_sock.bind(12347);
 	tx_sock.set_blocking(false);
-    
+
 
 	// Background threads
 	udp_rx_thread.start(udp_rx_worker);
@@ -632,7 +629,7 @@ int main() {
 	hb_led.period(0.02);
 	hb_led.write(0.0);
 
-    
+
 	// Look for the compass:
 	if (compass.init() < 0) {
 		u_printf("Failed to initialize compass\n");
@@ -647,8 +644,8 @@ int main() {
 	if (bno1.init() < 0) {
 		u_printf("Failed to initialize BNO055 IMU\n");
 	}
-    
-        
+
+
 	for (int ct=0; true; ++ct){
 
 		for (int i=0; i < 11; ++i) {
@@ -663,9 +660,9 @@ int main() {
 				wait_ms(20);     //wait_us(20000);  when use wait_us here, it has some timer problem with X Wheels class
 				Check_Pgm_Button();
 		}
-        
+
 		//u_printf("heeartbeatZ: %d\n", ct);
-        /*
+		/*
 		// Report motor values (for convience when setting trim)
 		uint16_t sbus_a = motorControl.get_value_a();
 		float pw_a = motorControl.get_pw_a();
@@ -674,17 +671,17 @@ int main() {
 		uint16_t sbus_b = motorControl.get_value_b();
 		float pw_b = motorControl.get_pw_b();
 		u_printf("throttle: %d %f\n", sbus_b, pw_b);
-        */
+		*/
 
 	}
     
 
-    
+
 	// Close the socket and bring down the network interface
 	rx_sock.close();
 	tx_sock.close();
 	net.disconnect();
-    
+
 	return 0;
 }
 
