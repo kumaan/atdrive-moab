@@ -17,7 +17,6 @@
 
 //#include "ROBOT_CONFIG_XDRIVE_OfficeLAN.hpp"
 #include "ROBOT_CONFIG_XDRIVE_GLiNet.hpp"
-//#include "ROBOT_CONFIG_XDRIVE_OfficeLAN.hpp"
 #include "EVENT_FLAGS.hpp"
 
 
@@ -226,7 +225,7 @@ void set_mode_manual() {
 
 	//motorControl.set_steering(sbup.ch1);
 	//motorControl.set_throttle(sbup.ch3);
-    drive.vehicleControl(sbup.ch2, sbup.ch4, motorRPM);
+    drive.vehicleControl(sbup.ch3, sbup.ch2, motorRPM);
     //pc.printf("ch2 %d\n", sbup.ch2);
     //pc.printf("ch4 %d\n", sbup.ch4);
     drive.DriveWheels(motorRPM[0],motorRPM[1]);
@@ -381,7 +380,7 @@ void sbus_reTx_worker() {
 			u_printf("S.Bus failsafe!\n");
 			set_mode_sbus_failsafe();
 		} else {
-			if if (sbup.ch7 < 1050 && sbup.ch7 > 950 && sbup.ch8 < 1050 && sbup.ch8 > 950 && sbup.ch6 < 1500 && !stop_trig) {
+			if (sbup.ch7 < 1050 && sbup.ch7 > 950 && sbup.ch8 < 1050 && sbup.ch8 > 950 && sbup.ch6 < 1500 && !stop_trig) {
 				set_mode_manual();
 
 			} else if (sbup.ch7 > 1050 && sbup.ch7 < 1100 && sbup.ch8 > 1050 && sbup.ch8 < 1100 && sbup.ch6 < 1500 && !stop_trig) {

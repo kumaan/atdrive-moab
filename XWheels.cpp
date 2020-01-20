@@ -2,13 +2,13 @@
 #include "mbed.h"
 // VEHICLE CONTROL , UGV DRIVE
 
-#define MIN_STICK 360       
-#define MAX_STICK 1673      
+#define MIN_STICK 430       
+#define MAX_STICK 1600      
 
-#define MIN_DEADBAND 1014
-#define MAX_DEADBAND 1034
+#define MIN_DEADBAND 999
+#define MAX_DEADBAND 1019
 
-#define MID_STICK 1024
+#define MID_STICK 1009
 #define DIVIDER 2           // a divider of another wheel's speed, e.g. 2 is half speed of the another wheel's speed
 
 float MAX_RPM = 144.0;         // Max RPM of the wheels, this is limited by wheels itself. Default is 144
