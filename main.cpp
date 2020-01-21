@@ -24,7 +24,7 @@
 #include "SbusParser.hpp"
 //#include "UbloxParser.hpp"
 //#include "MotorControl.hpp"
-#include "XWheels.hpp"
+#include "odrive.hpp"
 #include "ShaftEncoder.hpp"
 
 
@@ -68,8 +68,8 @@ DigitalOut myledB(LED2, 0);
 
 // Motors:
 //MotorControl motorControl(PD_14, PD_15);
-RawSerial wheelUART(PD_1,PD_0,9600);
-XWheels drive(&wheelUART);      // use XWheels class
+RawSerial ODSerial(PD_1,PD_0,115200);
+ODrive odrive(&ODSerial);      // use XWheels class
 float motorRPM[2];
 ShaftEncoder shaft(PE_11);
 
@@ -206,7 +206,7 @@ void set_mode_sbus_failsafe() {
 
 	//motorControl.set_steering(1024);
 	//motorControl.set_throttle(352);
-	drive.DriveWheels(0.0, 0.0);
+	odrive.DriveWheels(0.0, 0.0);
 }
 
 void set_mode_stop() {
@@ -216,7 +216,7 @@ void set_mode_stop() {
 
 	//motorControl.set_steering(1024);
 	//motorControl.set_throttle(352);
-	drive.DriveWheels(0.0, 0.0);
+	odrive.DriveWheels(0.0, 0.0);
 }
 
 void set_mode_manual() {
@@ -226,10 +226,10 @@ void set_mode_manual() {
 
 	//motorControl.set_steering(sbup.ch1);
 	//motorControl.set_throttle(sbup.ch3);
-	drive.vehicleControl(sbup.ch2, sbup.ch4, motorRPM);
+	odrive.vehicleControl(sbup.ch2, sbup.ch4, motorRPM);
 	//pc.printf("ch2 %d\n", sbup.ch2);
 	//pc.printf("ch4 %d\n", sbup.ch4);
-	drive.DriveWheels(motorRPM[0],motorRPM[1]);
+	odrive.DriveWheels(motorRPM[0],motorRPM[1]);
 }
 
 void set_mode_auto() {
@@ -241,7 +241,7 @@ void set_mode_auto() {
 	//motorControl.set_throttle(auto_ch2);
 	printf("rpmR: %f\n", rpmR);
 	printf("rpmL: %f\n", rpmL);
-	drive.DriveWheels(rpmR,rpmL);
+	odrive.DriveWheels(rpmR,rpmL);
 }
 
 
@@ -571,12 +571,24 @@ void eth_callback(nsapi_event_t status, intptr_t param) {
  
 int main() {
 
-	// X Drive Initialize ///
-	int initOK;
-	initOK = drive.Init();
-	if(initOK == 1)
-	{
-		pc.printf("Initialized OK!!!\n");
+	// ODrive Initialize ///
+	int requested_state;
+	int error0;
+	int error1;
+	requested_state = ODrive::AXIS_STATE_CLOSED_LOOP_CONTROL;
+	pc.printf("Axis0: Requesting State %d\n", requested_state);
+    odrive.run_state(motor0, requested_state, false); // don't wait
+    pc.printf("Axis1: Requesting State %d\n", requested_state);
+    odrive.run_state(motor1, requested_state, false); // don't wait
+	error0 = odrive.readError(motor0);
+	error1 = odrive.readError(motor1);
+	if (error0 != 0 && error1 !=0){
+		pc.printf("error0: %d\n", error0);
+		pc.printf("error1: %d\n", error1);
+		pc.printf("ODrive Error, please check the motor\n");
+	}
+	else{
+		pc.printf("ODrive Initialzation complete!\n");
 	}
 
 	//  ######################################

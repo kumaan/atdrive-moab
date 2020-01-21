@@ -36,6 +36,7 @@ public:
     float rpmTOcps(float rpm);
     void SetRPM(int motor_number, float RPM);
     float GetRPM(int motor_number);
+    int readError(int motor_number);
 
  
     // General params
@@ -46,6 +47,14 @@ public:
     // State helper
     bool run_state(int axis, int requested_state, bool wait);
     std::string readString();
+
+    long map(long x, long in_min, long in_max, long out_min, long out_max); 
+
+    void DriveWheels(float rpmR, float rpmL);
+
+    void vehicleControl(int UD_ch, int LR_ch, float MotorRPM[2]);
+
+
  
     Stream& serial_;
 private:
