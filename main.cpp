@@ -15,9 +15,9 @@
 #include "EthernetInterface.h"
 
 
-//#include "ROBOT_CONFIG_XDRIVE_OfficeLAN.hpp"
-#include "ROBOT_CONFIG_XDRIVE_GLiNet.hpp"
-//#include "ROBOT_CONFIG_XDRIVE_OfficeLAN.hpp"
+
+//#include "ROBOT_CONFIG_XDRIVE_GLiNet.hpp"
+#include "ROBOT_CONFIG_XDRIVE_OfficeLAN.hpp"
 #include "EVENT_FLAGS.hpp"
 
 
@@ -43,7 +43,7 @@ uint16_t button_port = 31345;
 uint16_t gps_port_nmea = 27113; // NMEA
 uint16_t imu_port = 27114;
 uint16_t imu_config_port = 27115;
-
+uint16_t odrive_wheel_port = 27116;
 
 bool NETWORK_IS_UP = false;
  
@@ -56,7 +56,7 @@ Thread udp_rx_thread;
 Thread sbus_reTx_thread;
 Thread gps_reTx_thread;
 Thread imu_thread;
-Thread gp_interrupt_messages_thread;
+//Thread gp_interrupt_messages_thread;
 
 // Heartbeat LED:
 PwmOut hb_led(PA_6);
@@ -68,10 +68,10 @@ DigitalOut myledB(LED2, 0);
 
 // Motors:
 //MotorControl motorControl(PD_14, PD_15);
-RawSerial ODSerial(PD_1,PD_0,115200);
-ODrive odrive(&ODSerial);      // use XWheels class
+Serial ODSerial(PD_1,PD_0,115200);
+ODrive odrive(ODSerial);      // use XWheels class
 float motorRPM[2];
-ShaftEncoder shaft(PE_11);
+//ShaftEncoder shaft(PE_11);
 
 /*****************************************
  * I2C Bus for external GPS module
@@ -87,16 +87,16 @@ ST_LIS3MDL compass(&mag_i2c);
  *****************************************/
 //   on schematic it's called:  BNO_SDA and BNO_SCL
 //  ports are: PD_13 (sda) and PD_12 (scl)
-I2C bno_i2c(PD_13, PD_12);  // sda, then scl
-BMP280 bmp1(&bno_i2c);
-BNO055 bno1(&bno_i2c);
+//I2C bno_i2c(PD_13, PD_12);  // sda, then scl
+//BMP280 bmp1(&bno_i2c);
+//BNO055 bno1(&bno_i2c);
 
 
 // S.Bus is 100000Hz, 8E2, electrically inverted
 RawSerial sbus_in(NC, PD_2, 100000);  // tx, then rx
 RawSerial gps_in(PE_8, PE_7, 115200);  //tx, then rx
 Serial pc(USBTX,USBRX,115200);                              // for print out something to PC
-InterruptIn pgm_switch(PE_9, PullUp);
+//InterruptIn pgm_switch(PE_9, PullUp);
 
 void u_printf(const char *fmt, ...) {
 	va_list args;
@@ -130,6 +130,7 @@ float rpmR; // for X wheels used
 float rpmL; // for X wheels used
 uint16_t Raw_rpmR; // for X wheels used
 uint16_t Raw_rpmL; // for X wheels used
+
 
 void udp_rx_worker() {
 
@@ -203,9 +204,10 @@ void set_mode_sbus_failsafe() {
 	myledR = 0;
 	myledG = 0;
 	myledB = 0;
-
+	//float readRPM[2];
 	//motorControl.set_steering(1024);
 	//motorControl.set_throttle(352);
+	//odrive.DriveWheels(0.0, 0.0,readRPM);
 	odrive.DriveWheels(0.0, 0.0);
 }
 
@@ -213,9 +215,10 @@ void set_mode_stop() {
 	myledR = 1;
 	myledG = 0;
 	myledB = 0;
-
+	//float readRPM[2];
 	//motorControl.set_steering(1024);
 	//motorControl.set_throttle(352);
+	//odrive.DriveWheels(0.0, 0.0,readRPM);
 	odrive.DriveWheels(0.0, 0.0);
 }
 
@@ -223,31 +226,26 @@ void set_mode_manual() {
 	myledR = 0;
 	myledG = 1;
 	myledB = 0;
-
 	//motorControl.set_steering(sbup.ch1);
 	//motorControl.set_throttle(sbup.ch3);
 	odrive.vehicleControl(sbup.ch2, sbup.ch4, motorRPM);
-	//pc.printf("ch2 %d\n", sbup.ch2);
-	//pc.printf("ch4 %d\n", sbup.ch4);
 	odrive.DriveWheels(motorRPM[0],motorRPM[1]);
+
 }
 
 void set_mode_auto() {
 	myledR = 0;
 	myledG = 0;
 	myledB = 1;
-
 	//motorControl.set_steering(auto_ch1);
 	//motorControl.set_throttle(auto_ch2);
-	printf("rpmR: %f\n", rpmR);
-	printf("rpmL: %f\n", rpmL);
-	odrive.DriveWheels(rpmR,rpmL);
+	odrive.DriveWheels(-rpmR,-rpmL);
 }
 
 
 
 
-
+/*
 volatile uint64_t _last_pgm_fall = 0;
 volatile uint64_t _last_pgm_rise = 0;
 uint64_t _last_pgm_fall_debounce = 0;
@@ -299,7 +297,7 @@ void Check_Pgm_Button() {
 		}
 	}
 }
-
+*/
 
 void Sbus_Rx_Interrupt() {
 
@@ -370,15 +368,20 @@ void gps_reTx_worker() {
 void sbus_reTx_worker() {
 
 	uint32_t flags_read;
-
+	float read_rpm[2];
+	struct odrive_data{
+		float read_rpmR;
+		float read_rpmL;
+	} odriveData;
+	memset(&odriveData, 0, sizeof(odriveData));
 	while (true) {
 		flags_read = event_flags.wait_any(_EVENT_FLAG_SBUS, 100);
 
 		if (flags_read & osFlagsError) {
-			u_printf("S.Bus timeout!\n");
+			//u_printf("S.Bus timeout!\n");
 			set_mode_sbus_failsafe();
 		} else if (sbup.failsafe) {
-			u_printf("S.Bus failsafe!\n");
+			//u_printf("S.Bus failsafe!\n");
 			set_mode_sbus_failsafe();
 		} else {
 			if (sbup.ch5 < 688) {
@@ -388,19 +391,34 @@ void sbus_reTx_worker() {
 			} else {
 				set_mode_auto();
 			}
-
+			
+			read_rpm[0] = odrive.GetRPM(0);
+			read_rpm[1] = odrive.GetRPM(1);
+			pc.printf("read_rpmR: %f\n", read_rpm[0]);
+			pc.printf("read_rpmL: %f\n", read_rpm[1]);
+			odriveData.read_rpmR = read_rpm[0];
+			odriveData.read_rpmL = read_rpm[1];
+			
+			
 			int retval = tx_sock.sendto(_AUTOPILOT_IP_ADDRESS, sbus_port,
 					(char *) &sbup, sizeof(struct sbus_udp_payload));
 
 			if (retval < 0 && NETWORK_IS_UP) {
 				printf("UDP socket error in sbus_reTx_worker\n");
 			}
+			
+			int retval2 = tx_sock.sendto(_AUTOPILOT_IP_ADDRESS, odrive_wheel_port,
+				(char *) &odriveData, sizeof(odriveData));
 
+			if (retval2 < 0 && NETWORK_IS_UP) {
+				printf("UDP socket error in sbus_reTx_worker (odrive_wheel_port)\n");
+			}
+			
 		}
 	}
 }
 
-
+/*
 void imu_worker() {
 
 	struct multi_data {
@@ -429,7 +447,7 @@ void imu_worker() {
 
 		// 64 bits:
 		// TODO:  do we really need float64 for these numbers?
-		double shaft_pps;
+		//double shaft_pps;
 
 	} mData;
 
@@ -490,7 +508,7 @@ void imu_worker() {
 			if (retval == 22) {
 				//mData.sbus_a = motorControl.get_value_a();
 				//mData.sbus_b = motorControl.get_value_b();
-				mData.shaft_pps = shaft.get_pps();
+				//mData.shaft_pps = shaft.get_pps();
 				int retval2 = tx_sock.sendto(_BROADCAST_IP_ADDRESS, imu_port,
 					(char*) &mData, sizeof(mData));
 			} else {
@@ -530,7 +548,7 @@ void imu_worker() {
 		}
 	}
 }
-
+*/
 
 
 void eth_callback(nsapi_event_t status, intptr_t param) {
@@ -577,11 +595,11 @@ int main() {
 	int error1;
 	requested_state = ODrive::AXIS_STATE_CLOSED_LOOP_CONTROL;
 	pc.printf("Axis0: Requesting State %d\n", requested_state);
-    odrive.run_state(motor0, requested_state, false); // don't wait
+    odrive.run_state(0, requested_state, false); // don't wait
     pc.printf("Axis1: Requesting State %d\n", requested_state);
-    odrive.run_state(motor1, requested_state, false); // don't wait
-	error0 = odrive.readError(motor0);
-	error1 = odrive.readError(motor1);
+    odrive.run_state(1, requested_state, false); // don't wait
+	error0 = odrive.readError(0);
+	error1 = odrive.readError(1);
 	if (error0 != 0 && error1 !=0){
 		pc.printf("error0: %d\n", error0);
 		pc.printf("error1: %d\n", error1);
@@ -598,14 +616,14 @@ int main() {
 	//  ############################################
 
 	printf("\n\nStarting the network...\n");
-
+	
 	net.attach(&eth_callback);
 	net.set_dhcp(false);
 	net.set_network(_MOAB_IP_ADDRESS, _NETMASK, _DEFUALT_GATEWAY);
 	net.set_blocking(false);
 
 	net.connect();
-
+	
 	//  ############################################
 	//   END:  setup network and udp socket
 	//  ###########################################
@@ -616,7 +634,7 @@ int main() {
 	sbus_in.format(8, SerialBase::Even, 2);  // S.Bus is 8E2
 	sbus_in.attach(&Sbus_Rx_Interrupt);
 	gps_in.attach(&Gps_Rx_Interrupt);
-
+	
 	// UDP Sockets
 	rx_sock.open(&net);
 	rx_sock.bind(12346);
@@ -625,26 +643,28 @@ int main() {
 	tx_sock.bind(12347);
 	tx_sock.set_blocking(false);
 
-
+	// I found that if there is a delay here the Ethernet and Sbus thread won't crash, 
+	// and we can read wheels rpm directly in sbus thread...
 	// Background threads
+	wait(3);  
 	udp_rx_thread.start(udp_rx_worker);
 	sbus_reTx_thread.start(sbus_reTx_worker);
 	gps_reTx_thread.start(gps_reTx_worker);
-	imu_thread.start(imu_worker);
+	//imu_thread.start(imu_worker);
 
 
-	pgm_switch.rise(&Gpin_Interrupt_Pgm);
-	pgm_switch.fall(&Gpin_Interrupt_Pgm);
-
+	//pgm_switch.rise(&Gpin_Interrupt_Pgm);
+	//pgm_switch.fall(&Gpin_Interrupt_Pgm);
+	
 	hb_led.period(0.02);
 	hb_led.write(0.0);
 
-
+	
 	// Look for the compass:
 	if (compass.init() < 0) {
 		u_printf("Failed to initialize compass\n");
 	}
-
+	/*
 	// BMP280 barometer:
 	if (bmp1.init() < 0) {
 		u_printf("Failed to initialize barometer\n");
@@ -654,7 +674,7 @@ int main() {
 	if (bno1.init() < 0) {
 		u_printf("Failed to initialize BNO055 IMU\n");
 	}
-
+	*/
  
 	for (int ct=0; true; ++ct){
 
@@ -662,13 +682,13 @@ int main() {
 				float brightness = i/10.0;
 				hb_led.write(brightness);
 				wait_ms(20);     //wait_us(20000);  when use wait_us here, it has some timer problem with X Wheels class
-				Check_Pgm_Button();
+				//Check_Pgm_Button();
 		}
 		for (int i=0; i < 11; ++i) {
 				float brightness = 1.0 - i/10.0;
 				hb_led.write(brightness);
 				wait_ms(20);     //wait_us(20000);  when use wait_us here, it has some timer problem with X Wheels class
-				Check_Pgm_Button();
+				//Check_Pgm_Button();
 		}
         
 		//u_printf("heeartbeatZ: %d\n", ct);
@@ -683,7 +703,7 @@ int main() {
 		u_printf("throttle: %d %f\n", sbus_b, pw_b);
 		*/
 	}
-
+	
 	// Close the socket and bring down the network interface
 	rx_sock.close();
 	tx_sock.close();

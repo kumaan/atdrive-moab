@@ -52,6 +52,8 @@ public:
 
     void DriveWheels(float rpmR, float rpmL);
 
+    void DriveWheels(float rpmR, float rpmL, float readRPM[2]);
+
     void vehicleControl(int UD_ch, int LR_ch, float MotorRPM[2]);
 
 
@@ -59,7 +61,17 @@ public:
     Stream& serial_;
 private:
     float cpr = 258.0;
-    
+    float MAX_RPM = 140.0;         // Max RPM of the wheels, this is limited by wheels itself. Default is 144
+    float ZERO_RPM = 0.0;          // No speed
+    int MIN_STICK = 360;       
+    int MAX_STICK = 1673;     
+
+    int MIN_DEADBAND = 1014;
+    int MAX_DEADBAND = 1034;
+
+    int MID_STICK = 1024;
+    int DIVIDER = 2;           // a divider of another wheel's speed, e.g. 2 is half speed of the another wheel's speed
+
 };
  
 #endif //ODrive_h
