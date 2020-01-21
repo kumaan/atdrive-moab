@@ -87,9 +87,9 @@ ST_LIS3MDL compass(&mag_i2c);
  *****************************************/
 //   on schematic it's called:  BNO_SDA and BNO_SCL
 //  ports are: PD_13 (sda) and PD_12 (scl)
-//I2C bno_i2c(PD_13, PD_12);  // sda, then scl
-//BMP280 bmp1(&bno_i2c);
-//BNO055 bno1(&bno_i2c);
+I2C bno_i2c(PD_13, PD_12);  // sda, then scl
+BMP280 bmp1(&bno_i2c);
+BNO055 bno1(&bno_i2c);
 
 
 // S.Bus is 100000Hz, 8E2, electrically inverted
@@ -380,22 +380,30 @@ void sbus_reTx_worker() {
 		if (flags_read & osFlagsError) {
 			//u_printf("S.Bus timeout!\n");
 			set_mode_sbus_failsafe();
+			read_rpm[0] = 0.0;
+			read_rpm[1] = 0.0;
 		} else if (sbup.failsafe) {
 			//u_printf("S.Bus failsafe!\n");
 			set_mode_sbus_failsafe();
+			read_rpm[0] = 0.0;
+			read_rpm[1] = 0.0;
 		} else {
 			if (sbup.ch5 < 688) {
 				set_mode_stop();
+				read_rpm[0] = 0.0;
+				read_rpm[1] = 0.0;
 			} else if (sbup.ch5 < 1360) {
 				set_mode_manual();
+				read_rpm[0] = odrive.GetRPM(0);
+				read_rpm[1] = odrive.GetRPM(1);
 			} else {
 				set_mode_auto();
+				read_rpm[0] = odrive.GetRPM(0);
+				read_rpm[1] = odrive.GetRPM(1);
 			}
 			
-			read_rpm[0] = odrive.GetRPM(0);
-			read_rpm[1] = odrive.GetRPM(1);
-			pc.printf("read_rpmR: %f\n", read_rpm[0]);
-			pc.printf("read_rpmL: %f\n", read_rpm[1]);
+			//pc.printf("read_rpmR: %f\n", read_rpm[0]);
+			//pc.printf("read_rpmL: %f\n", read_rpm[1]);
 			odriveData.read_rpmR = read_rpm[0];
 			odriveData.read_rpmL = read_rpm[1];
 			
@@ -418,7 +426,7 @@ void sbus_reTx_worker() {
 	}
 }
 
-/*
+
 void imu_worker() {
 
 	struct multi_data {
@@ -447,14 +455,15 @@ void imu_worker() {
 
 		// 64 bits:
 		// TODO:  do we really need float64 for these numbers?
-		//double shaft_pps;
+		double shaft_pps;
 
 	} mData;
 
 	memset(&mData, 0, sizeof(mData));
-
+	
 	int count = 0;
 	while (true) {
+		
 		if (imu_mode == config_read) {
 			u_printf(" --------------- inside imu worker, config read\n");
 			char bno_config[22];
@@ -481,9 +490,9 @@ void imu_worker() {
 			}
 			imu_mode = normal;
 		}
-
-
-		wait_ms(10); // 100Hz   // wait_us has a timer problem with X Wheels class
+		
+		wait_ms(100);
+		//wait_ms(10); // 100Hz   // wait_us has a timer problem with X Wheels class
 
 		// Check the external compass at 20 Hz:
 		if (count % 5 == 0) {
@@ -516,7 +525,7 @@ void imu_worker() {
 				//printf("failed to get data from external compass\n");
 			}
 		}
-
+		
 		// Check temp and pressure at 2 Hz:
 		if (count % 50 == 0) {
 			bmp1.get_data();
@@ -526,7 +535,7 @@ void imu_worker() {
 			u_printf("bmp._temp: %f\n", bmp1._temp);
 			u_printf("bmp._press: %f\n", bmp1._press);
 		}
-
+		
 
 		count++;
 		if (count > 500) {
@@ -546,9 +555,11 @@ void imu_worker() {
 				gps_in.putc(UBX_CFG_RATE[i]);
 			}
 		}
+		
 	}
+	
 }
-*/
+
 
 
 void eth_callback(nsapi_event_t status, intptr_t param) {
@@ -646,25 +657,13 @@ int main() {
 	// I found that if there is a delay here the Ethernet and Sbus thread won't crash, 
 	// and we can read wheels rpm directly in sbus thread...
 	// Background threads
-	wait(3);  
-	udp_rx_thread.start(udp_rx_worker);
-	sbus_reTx_thread.start(sbus_reTx_worker);
-	gps_reTx_thread.start(gps_reTx_worker);
 	//imu_thread.start(imu_worker);
-
-
-	//pgm_switch.rise(&Gpin_Interrupt_Pgm);
-	//pgm_switch.fall(&Gpin_Interrupt_Pgm);
-	
-	hb_led.period(0.02);
-	hb_led.write(0.0);
-
 	
 	// Look for the compass:
 	if (compass.init() < 0) {
 		u_printf("Failed to initialize compass\n");
 	}
-	/*
+	
 	// BMP280 barometer:
 	if (bmp1.init() < 0) {
 		u_printf("Failed to initialize barometer\n");
@@ -674,8 +673,23 @@ int main() {
 	if (bno1.init() < 0) {
 		u_printf("Failed to initialize BNO055 IMU\n");
 	}
-	*/
- 
+
+
+	wait(3);
+	udp_rx_thread.start(udp_rx_worker);  
+	pc.printf("sbus thread start\n");
+	sbus_reTx_thread.start(sbus_reTx_worker);
+	gps_reTx_thread.start(gps_reTx_worker);
+	
+
+
+	//pgm_switch.rise(&Gpin_Interrupt_Pgm);
+	//pgm_switch.fall(&Gpin_Interrupt_Pgm);
+	
+	hb_led.period(0.02);
+	hb_led.write(0.0);
+
+
 	for (int ct=0; true; ++ct){
 
 		for (int i=0; i < 11; ++i) {
