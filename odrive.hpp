@@ -61,7 +61,7 @@ public:
     Stream& serial_;
 private:
     float cpr = 258.0;
-    float MAX_RPM = 140.0;         // Max RPM of the wheels, this is limited by wheels itself. Default is 144
+    float MAX_RPM = 200.0;         // Max RPM of the wheels, this is limited by wheels itself. Default is 144
     float ZERO_RPM = 0.0;          // No speed
     int MIN_STICK = 360;       
     int MAX_STICK = 1673;     
