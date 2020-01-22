@@ -368,59 +368,64 @@ void gps_reTx_worker() {
 void sbus_reTx_worker() {
 
 	uint32_t flags_read;
-	float read_rpm[2];
+	/*float read_rpm[2];
 	struct odrive_data{
 		float read_rpmR;
 		float read_rpmL;
 	} odriveData;
-	memset(&odriveData, 0, sizeof(odriveData));
+	memset(&odriveData, 0, sizeof(odriveData));*/
 	while (true) {
 		flags_read = event_flags.wait_any(_EVENT_FLAG_SBUS, 100);
 
 		if (flags_read & osFlagsError) {
 			//u_printf("S.Bus timeout!\n");
 			set_mode_sbus_failsafe();
-			read_rpm[0] = 0.0;
-			read_rpm[1] = 0.0;
+			//read_rpm[0] = 0.0;
+			//read_rpm[1] = 0.0;
 		} else if (sbup.failsafe) {
 			//u_printf("S.Bus failsafe!\n");
 			set_mode_sbus_failsafe();
-			read_rpm[0] = 0.0;
-			read_rpm[1] = 0.0;
+			//read_rpm[0] = 0.0;
+			//read_rpm[1] = 0.0;
 		} else {
 			if (sbup.ch5 < 688) {
 				set_mode_stop();
-				read_rpm[0] = 0.0;
-				read_rpm[1] = 0.0;
+				//read_rpm[0] = 0.0;
+				//read_rpm[1] = 0.0;
 			} else if (sbup.ch5 < 1360) {
 				set_mode_manual();
-				read_rpm[0] = odrive.GetRPM(0);
-				read_rpm[1] = odrive.GetRPM(1);
+				//read_rpm[0] = odrive.GetRPM(0);
+				//read_rpm[1] = odrive.GetRPM(1);
 			} else {
 				set_mode_auto();
-				read_rpm[0] = odrive.GetRPM(0);
-				read_rpm[1] = odrive.GetRPM(1);
+				//read_rpm[0] = odrive.GetRPM(0);
+				//read_rpm[1] = odrive.GetRPM(1);
 			}
 			
 			//pc.printf("read_rpmR: %f\n", read_rpm[0]);
 			//pc.printf("read_rpmL: %f\n", read_rpm[1]);
-			odriveData.read_rpmR = read_rpm[0];
-			odriveData.read_rpmL = read_rpm[1];
+			//odriveData.read_rpmR = read_rpm[0];
+			//odriveData.read_rpmL = read_rpm[1];
 			
-			
+			// GeRPM should be called after SetRPM so the command frame 
+			// wouldn't overlap each other if call from other thread, BUT.....
+			// I tried also only GetRPM but after a while the whole thread crash
+			// even when I put GetRPM into imu_worker thread, it's same.... :(
+			// So I don't think using GetRPM in the mbed is a good idea.... or I missed something
+			// I am using another python scipt to get odometry feedback and it's super fast!
 			int retval = tx_sock.sendto(_AUTOPILOT_IP_ADDRESS, sbus_port,
 					(char *) &sbup, sizeof(struct sbus_udp_payload));
 
 			if (retval < 0 && NETWORK_IS_UP) {
 				printf("UDP socket error in sbus_reTx_worker\n");
 			}
-			
+			/*
 			int retval2 = tx_sock.sendto(_AUTOPILOT_IP_ADDRESS, odrive_wheel_port,
 				(char *) &odriveData, sizeof(odriveData));
 
 			if (retval2 < 0 && NETWORK_IS_UP) {
 				printf("UDP socket error in sbus_reTx_worker (odrive_wheel_port)\n");
-			}
+			}*/
 			
 		}
 	}
@@ -428,7 +433,7 @@ void sbus_reTx_worker() {
 
 
 void imu_worker() {
-
+	
 	struct multi_data {
 
 		// 64 bits:
@@ -458,10 +463,11 @@ void imu_worker() {
 		double shaft_pps;
 
 	} mData;
-
-	memset(&mData, 0, sizeof(mData));
 	
+	memset(&mData, 0, sizeof(mData));
+	float read_rpm[2];
 	int count = 0;
+	char bnoData[22];
 	while (true) {
 		
 		if (imu_mode == config_read) {
@@ -491,9 +497,8 @@ void imu_worker() {
 			imu_mode = normal;
 		}
 		
-		wait_ms(100);
-		//wait_ms(10); // 100Hz   // wait_us has a timer problem with X Wheels class
-
+		wait_ms(10); // 100Hz   // wait_us has a timer problem with X Wheels class
+		
 		// Check the external compass at 20 Hz:
 		if (count % 5 == 0) {
 			// First we zero-out the numbers, to detect if the compass has been disconnected
@@ -508,12 +513,14 @@ void imu_worker() {
 			//	printf("failed to get data from external compass\n");
 			//}
 		}
-
-
+		
+		
 		// Check IMU at 50 Hz:
 		if (count % 2 == 0) {
 			int retval = bno1.get_data(mData.bnoData);
-
+			//int retval = bno1.get_data(bnoData);
+			//pc.printf("retval_imu %d\n", retval);
+			
 			if (retval == 22) {
 				//mData.sbus_a = motorControl.get_value_a();
 				//mData.sbus_b = motorControl.get_value_b();
@@ -555,7 +562,7 @@ void imu_worker() {
 				gps_in.putc(UBX_CFG_RATE[i]);
 			}
 		}
-		
+
 	}
 	
 }
@@ -605,9 +612,9 @@ int main() {
 	int error0;
 	int error1;
 	requested_state = ODrive::AXIS_STATE_CLOSED_LOOP_CONTROL;
-	pc.printf("Axis0: Requesting State %d\n", requested_state);
+	//pc.printf("Axis0: Requesting State %d\n", requested_state);
     odrive.run_state(0, requested_state, false); // don't wait
-    pc.printf("Axis1: Requesting State %d\n", requested_state);
+    //pc.printf("Axis1: Requesting State %d\n", requested_state);
     odrive.run_state(1, requested_state, false); // don't wait
 	error0 = odrive.readError(0);
 	error1 = odrive.readError(1);
@@ -653,11 +660,10 @@ int main() {
 	tx_sock.open(&net);
 	tx_sock.bind(12347);
 	tx_sock.set_blocking(false);
-
+	wait(3);
 	// I found that if there is a delay here the Ethernet and Sbus thread won't crash, 
-	// and we can read wheels rpm directly in sbus thread...
 	// Background threads
-	//imu_thread.start(imu_worker);
+	imu_thread.start(imu_worker);
 	
 	// Look for the compass:
 	if (compass.init() < 0) {
@@ -673,16 +679,12 @@ int main() {
 	if (bno1.init() < 0) {
 		u_printf("Failed to initialize BNO055 IMU\n");
 	}
-
-
-	wait(3);
+		
 	udp_rx_thread.start(udp_rx_worker);  
 	pc.printf("sbus thread start\n");
 	sbus_reTx_thread.start(sbus_reTx_worker);
 	gps_reTx_thread.start(gps_reTx_worker);
 	
-
-
 	//pgm_switch.rise(&Gpin_Interrupt_Pgm);
 	//pgm_switch.fall(&Gpin_Interrupt_Pgm);
 	
