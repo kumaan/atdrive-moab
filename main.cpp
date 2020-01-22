@@ -24,7 +24,7 @@
 //#include "UbloxParser.hpp"
 //#include "MotorControl.hpp"
 #include "XWheels.hpp"
-#include "ShaftEncoder.hpp"
+//#include "ShaftEncoder.hpp"
 
 
 #include "drivers/ST_LIS3MDL.hpp"
@@ -37,7 +37,7 @@ uint16_t debug_port = 31337;
 uint16_t sbus_port = 31338;
 uint16_t button_port = 31345;
 
-//uint16_t gps_port = 27110; // ublox
+uint16_t gps_port = 27110; // ublox
 //uint16_t odometry_port = 27112;
 uint16_t gps_port_nmea = 27113; // NMEA
 uint16_t imu_port = 27114;
@@ -55,7 +55,7 @@ Thread udp_rx_thread;
 Thread sbus_reTx_thread;
 Thread gps_reTx_thread;
 Thread imu_thread;
-Thread gp_interrupt_messages_thread;
+//Thread gp_interrupt_messages_thread;
 
 // Heartbeat LED:
 PwmOut hb_led(PA_6);
@@ -70,7 +70,7 @@ DigitalOut myledB(LED2, 0);
 RawSerial wheelUART(PD_1,PD_0,9600);
 XWheels drive(&wheelUART);      // use XWheels class
 float motorRPM[2];
-ShaftEncoder shaft(PE_11);
+//ShaftEncoder shaft(PE_11);
 
 /*****************************************
  * I2C Bus for external GPS module
@@ -95,7 +95,7 @@ BNO055 bno1(&bno_i2c);
 RawSerial sbus_in(NC, PD_2, 100000);  // tx, then rx
 RawSerial gps_in(PE_8, PE_7, 115200);  //tx, then rx
 Serial pc(USBTX,USBRX,115200);                              // for print out something to PC
-InterruptIn pgm_switch(PE_9, PullUp);
+//InterruptIn pgm_switch(PE_9, PullUp);
 
 void u_printf(const char *fmt, ...) {
 	va_list args;
@@ -238,13 +238,13 @@ void set_mode_auto() {
 
 	//motorControl.set_steering(auto_ch1);
 	//motorControl.set_throttle(auto_ch2);
-	printf("rpmR: %f\n", rpmR);
-	printf("rpmL: %f\n", rpmL);
+	//printf("rpmR: %f\n", rpmR);
+	//printf("rpmL: %f\n", rpmL);
 	drive.DriveWheels(rpmR,rpmL);
 }
 
 
-
+/*
 volatile uint64_t _last_pgm_fall = 0;
 volatile uint64_t _last_pgm_rise = 0;
 uint64_t _last_pgm_fall_debounce = 0;
@@ -296,7 +296,7 @@ void Check_Pgm_Button() {
 		}
 	}
 }
-
+*/
 
 void Sbus_Rx_Interrupt() {
 
@@ -370,17 +370,18 @@ void sbus_reTx_worker() {
 	bool stop_trig = false;
 	while (true) {
 		flags_read = event_flags.wait_any(_EVENT_FLAG_SBUS, 100);
-
 		if (flags_read & osFlagsError) {
-			u_printf("S.Bus timeout!\n");
+			//u_printf("S.Bus timeout!\n");
+			//pc.printf("timeout\n");
 			set_mode_sbus_failsafe();
 		} else if (sbup.failsafe) {
-			u_printf("S.Bus failsafe!\n");
+			//u_printf("S.Bus failsafe!\n");
+			//pc.printf("failsafe\n");
 			set_mode_sbus_failsafe();
 		} else {
 			if (sbup.ch7 < 1050 && sbup.ch7 > 950 && sbup.ch8 < 1050 && sbup.ch8 > 950 && sbup.ch6 < 1500 && !stop_trig) {
 				set_mode_manual();
-
+				pc.printf("manual\n");
 			} else if (sbup.ch7 > 1050 && sbup.ch7 < 1100 && sbup.ch8 > 1050 && sbup.ch8 < 1100 && sbup.ch6 < 1500 && !stop_trig) {
 				set_mode_auto();
 			} else {
@@ -391,6 +392,7 @@ void sbus_reTx_worker() {
 					stop_trig = true;
 				}
 			}
+			
             
 			int retval = tx_sock.sendto(_AUTOPILOT_IP_ADDRESS, sbus_port,
 					(char *) &sbup, sizeof(struct sbus_udp_payload));
@@ -398,6 +400,7 @@ void sbus_reTx_worker() {
 			if (retval < 0 && NETWORK_IS_UP) {
 				printf("UDP socket error in sbus_reTx_worker\n");
 			}
+
 		}
 	}
 }
@@ -492,7 +495,7 @@ void imu_worker() {
 			if (retval == 22) {
 				//mData.sbus_a = motorControl.get_value_a();
 				//mData.sbus_b = motorControl.get_value_b();
-				mData.shaft_pps = shaft.get_pps();
+				//mData.shaft_pps = shaft.get_pps();
 				int retval2 = tx_sock.sendto(_BROADCAST_IP_ADDRESS, imu_port,
 					(char*) &mData, sizeof(mData));
 			} else {
@@ -572,7 +575,7 @@ void eth_callback(nsapi_event_t status, intptr_t param) {
 
  
 int main() {
-
+	
 	// X Drive Initialize ///
 	int initOK;
 	initOK = drive.Init();
@@ -580,7 +583,9 @@ int main() {
 	{
 		pc.printf("Initialized OK!!!\n");
 	}
+	
 
+	
 	//  ######################################
 	//  #########################################
 	//  ###########################################
@@ -588,7 +593,7 @@ int main() {
 	//  ############################################
 
 	printf("\n\nStarting the network...\n");
-
+	
 	net.attach(&eth_callback);
 	net.set_dhcp(false);
 	net.set_network(_MOAB_IP_ADDRESS, _NETMASK, _DEFUALT_GATEWAY);
@@ -615,7 +620,6 @@ int main() {
 	tx_sock.bind(12347);
 	tx_sock.set_blocking(false);
 
-
 	// Background threads
 	udp_rx_thread.start(udp_rx_worker);
 	sbus_reTx_thread.start(sbus_reTx_worker);
@@ -623,13 +627,13 @@ int main() {
 	imu_thread.start(imu_worker);
 
 
-	pgm_switch.rise(&Gpin_Interrupt_Pgm);
-	pgm_switch.fall(&Gpin_Interrupt_Pgm);
+	//pgm_switch.rise(&Gpin_Interrupt_Pgm);
+	//pgm_switch.fall(&Gpin_Interrupt_Pgm);
 
 	hb_led.period(0.02);
 	hb_led.write(0.0);
 
-
+	
 	// Look for the compass:
 	if (compass.init() < 0) {
 		u_printf("Failed to initialize compass\n");
@@ -644,7 +648,7 @@ int main() {
 	if (bno1.init() < 0) {
 		u_printf("Failed to initialize BNO055 IMU\n");
 	}
-
+	
 
 	for (int ct=0; true; ++ct){
 
@@ -652,13 +656,13 @@ int main() {
 				float brightness = i/10.0;
 				hb_led.write(brightness);
 				wait_ms(20);     //wait_us(20000);  when use wait_us here, it has some timer problem with X Wheels class
-				Check_Pgm_Button();
+				//Check_Pgm_Button();
 		}
 		for (int i=0; i < 11; ++i) {
 				float brightness = 1.0 - i/10.0;
 				hb_led.write(brightness);
 				wait_ms(20);     //wait_us(20000);  when use wait_us here, it has some timer problem with X Wheels class
-				Check_Pgm_Button();
+				//Check_Pgm_Button();
 		}
 
 		//u_printf("heeartbeatZ: %d\n", ct);
