@@ -243,6 +243,13 @@ void set_mode_auto() {
 	drive.DriveWheels(rpmR,rpmL);
 }
 
+void set_mode_wake_up() {
+	myledR = 1;
+	myledG = 1;
+	myledB = 1;
+	
+	drive.DriveWheels(0.0, 0.0);
+}
 
 /*
 volatile uint64_t _last_pgm_fall = 0;
@@ -367,7 +374,11 @@ void gps_reTx_worker() {
 void sbus_reTx_worker() {
 
 	uint32_t flags_read;
+	uint16_t val_manu,val_auto;
 	bool stop_trig = false;
+	bool start_ch_val = true;
+	bool switch_flg = false;
+
 	while (true) {
 		flags_read = event_flags.wait_any(_EVENT_FLAG_SBUS, 100);
 		if (flags_read & osFlagsError) {
@@ -379,11 +390,30 @@ void sbus_reTx_worker() {
 			//pc.printf("failsafe\n");
 			set_mode_sbus_failsafe();
 		} else {
-			if (sbup.ch7 < 1050 && sbup.ch7 > 950 && sbup.ch8 < 1050 && sbup.ch8 > 950 && sbup.ch6 < 1500 && !stop_trig) {
+
+			while ( start_ch_val ){
+				set_mode_wake_up();
+				
+				if(sbup.ch5 > 1500){
+					val_manu = sbup.ch7;
+					val_auto = sbup.ch7 + 100;
+					start_ch_val = false;
+					break;
+				}
+			}
+			
+			if ( !(val_auto+50 > sbup.ch7 && val_auto-50 < sbup.ch7) && !switch_flg ){
+				val_manu = sbup.ch7;
+			} else if ( !(val_manu+50 > sbup.ch7 && val_manu-50 < sbup.ch7 ) && switch_flg ){
+				val_auto = sbup.ch7;
+			}
+			
+			if ( (val_manu+50 > sbup.ch7 && val_manu-50 < sbup.ch7 ) && sbup.ch6 < 1500 && !stop_trig ) {
 				set_mode_manual();
-				pc.printf("manual\n");
-			} else if (sbup.ch7 > 1050 && sbup.ch7 < 1100 && sbup.ch8 > 1050 && sbup.ch8 < 1100 && sbup.ch6 < 1500 && !stop_trig) {
+				switch_flg = true;
+			} else if ( (val_auto+50 > sbup.ch7 && val_auto-50 < sbup.ch7 ) && sbup.ch6 < 1500 && !stop_trig) {
 				set_mode_auto();
+				switch_flg = false;	
 			} else {
 				set_mode_stop();
 				if (sbup.ch5 > 1500){
@@ -393,7 +423,6 @@ void sbus_reTx_worker() {
 				}
 			}
 			
-            
 			int retval = tx_sock.sendto(_AUTOPILOT_IP_ADDRESS, sbus_port,
 					(char *) &sbup, sizeof(struct sbus_udp_payload));
 
